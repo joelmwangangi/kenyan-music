@@ -41,7 +41,7 @@ else:
     df_search = df_kenya.copy()
 
 # ------------------------------
-# YouTube Scraping for Social Score
+# YouTube Social Score Scraping
 # ------------------------------
 @st.cache_data(show_spinner=False)
 def scrape_youtube_score(artist_name, max_videos=5):
@@ -58,11 +58,15 @@ def scrape_youtube_score(artist_name, max_videos=5):
         st.warning(f"YouTube scraping error for {artist_name}: {e}")
     return score
 
+# Compute social scores
 with st.spinner("Scraping YouTube for social scores..."):
     social_scores = {}
     for artist in df_search["artist_name"].unique():
         social_scores[artist] = scrape_youtube_score(artist)
-    df_search["social_score"] = df_search["artist_name"].map(social_scores).fillna(0)
+    df_search["social_score"] = df_search["artist_name"].map(social_scores)
+
+# Ensure numeric and fill missing values
+df_search["social_score"] = pd.to_numeric(df_search["social_score"], errors='coerce').fillna(0)
 
 # ------------------------------
 # Stats Cards
@@ -116,4 +120,6 @@ if tracks_count >= 3:
     st.write("## Recommended For You (Trending + Audio Features)")
     st.dataframe(recs[["track_name", "artist_name", "popularity", "social_score"]].reset_index(drop=True))
 
+    # Update recs metric
     col4.metric("Recs Count", recs_count)
+
