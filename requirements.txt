@@ -4,3 +4,5 @@ numpy
 plotly
 scikit-learn
 datasets
+snscrape
+youtube-search-python
