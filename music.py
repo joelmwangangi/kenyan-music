@@ -4,9 +4,6 @@ import numpy as np
 from datasets import load_dataset
 import plotly.express as px
 from sklearn.neighbors import NearestNeighbors
-
-# For social media scraping
-import snscrape.modules.twitter as sntwitter
 from youtubesearchpython import VideosSearch
 
 # ------------------------------
@@ -44,46 +41,28 @@ else:
     df_search = df_kenya.copy()
 
 # ------------------------------
-# Social Media Scraping Functions
+# YouTube Scraping for Social Score
 # ------------------------------
 @st.cache_data(show_spinner=False)
-def scrape_twitter_score(artist_name, max_tweets=30):
-    """Scrape tweets and calculate a social score."""
-    score = 0
-    try:
-        for i, tweet in enumerate(sntwitter.TwitterSearchScraper(f'"{artist_name}" lang:en').get_items()):
-            if i >= max_tweets:
-                break
-            score += tweet.likeCount + tweet.retweetCount
-    except Exception as e:
-        st.warning(f"Twitter scraping error for {artist_name}: {e}")
-    return score
-
-@st.cache_data(show_spinner=False)
 def scrape_youtube_score(artist_name, max_videos=5):
-    """Scrape YouTube trending music videos for an artist."""
+    """Scrape YouTube trending music videos for an artist and return a social score."""
     score = 0
     try:
         videosSearch = VideosSearch(artist_name, limit=max_videos)
         results = videosSearch.result().get("result", [])
         for video in results:
-            views = int(video.get("viewCount", {}).get("text", "0").replace(",", "").split()[0])
-            score += views
+            view_text = video.get("viewCount", {}).get("text", "0")
+            view_count = int(view_text.replace(",", "").split()[0]) if view_text else 0
+            score += view_count
     except Exception as e:
         st.warning(f"YouTube scraping error for {artist_name}: {e}")
     return score
 
-# ------------------------------
-# Compute social score per artist
-# ------------------------------
-with st.spinner("Scraping social media for trending scores..."):
+with st.spinner("Scraping YouTube for social scores..."):
     social_scores = {}
     for artist in df_search["artist_name"].unique():
-        twitter_score = scrape_twitter_score(artist)
-        youtube_score = scrape_youtube_score(artist)
-        social_scores[artist] = twitter_score + youtube_score
-
-df_search["social_score"] = df_search["artist_name"].map(social_scores).fillna(0)
+        social_scores[artist] = scrape_youtube_score(artist)
+    df_search["social_score"] = df_search["artist_name"].map(social_scores).fillna(0)
 
 # ------------------------------
 # Stats Cards
@@ -92,7 +71,7 @@ tracks_count = len(df_search)
 artists_count = df_search["artist_name"].nunique()
 avg_popularity = round(df_search["popularity"].mean(), 2)
 avg_social = int(df_search["social_score"].mean())
-recs_count = 0  # will update after recommendations
+recs_count = 0
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Tracks", tracks_count)
@@ -122,7 +101,7 @@ with tab3:
             st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------
-# Hybrid Recommendation (Audio + Social Score)
+# Hybrid Recommendation (Audio + YouTube Social Score)
 # ------------------------------
 if tracks_count >= 3:
     feature_cols = ["popularity", "duration_ms", "social_score"]
